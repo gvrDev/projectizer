@@ -1,54 +1,17 @@
-use std::env;
-use std::fs;
 use std::io::Write;
-use std::path::Path;
 use std::process::Command;
 use std::process::Stdio;
 
-fn read_cache_file(path: &str, error: &str, join_char: &str) -> String {
-    let file_content = fs::read_to_string(path).expect(error);
-    let parsed_content: Vec<&str> = file_content.split_whitespace().collect();
+use handler::ProjectizerHandler;
 
-    parsed_content.join(join_char)
-}
+pub mod handler;
+pub mod utils;
 
 fn main() {
-    let home = env::var("HOME").unwrap();
-    let config_path = format!("{}/.config/projectizer", home);
-    let normal_cache_path = format!("{}/.config/projectizer/projectizer.cache.txt", home);
-    let recursive_cache_path = format!(
-        "{}/.config/projectizer/projectizer.recursive.cache.txt",
-        home
-    );
-
-    if !Path::new(&config_path).exists() {
-        fs::create_dir_all(&config_path).unwrap();
-    }
-
-    let mut paths = vec![
-        format!("{}/dev/work", home),
-        format!("{}/dev/personal", home),
-        format!("{}/dotfiles", home),
-        read_cache_file(&normal_cache_path, "failed to read normal cache file", "\n"),
-    ];
-
-    {
-        let find_arg = format!(
-            "find {} -mindepth 1 -maxdepth 1 -type d,f",
-            read_cache_file(
-                &recursive_cache_path,
-                "failed to read recursive cache file",
-                " "
-            )
-        );
-        let find = Command::new("bash")
-            .arg("-c")
-            .arg(find_arg)
-            .output()
-            .expect("failed to execute find");
-
-        paths.push(String::from_utf8(find.stdout).unwrap());
-    }
+    let handler = ProjectizerHandler::new()
+        .validate()
+        .append_normal_cache_to_paths()
+        .append_recursive_cache_to_paths();
 
     loop {
         let mut fzf = Command::new("fzf")
@@ -60,7 +23,7 @@ fn main() {
         {
             let local_stdin = fzf.stdin.as_mut().expect("Failed to open stdin");
 
-            for path in &paths {
+            for path in &handler.paths {
                 writeln!(local_stdin, "{}", path).expect("Failed to write to stdin");
             }
         }
