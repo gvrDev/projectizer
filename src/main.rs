@@ -1,6 +1,4 @@
-use std::io::Write;
 use std::process::Command;
-use std::process::Stdio;
 
 use handler::ProjectizerHandler;
 
@@ -14,23 +12,7 @@ fn main() {
         .append_recursive_cache_to_paths();
 
     loop {
-        let mut fzf = Command::new("fzf")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn()
-            .expect("Failed to start fzf");
-
-        {
-            let local_stdin = fzf.stdin.as_mut().expect("Failed to open stdin");
-
-            for path in &handler.paths {
-                writeln!(local_stdin, "{}", path).expect("Failed to write to stdin");
-            }
-        }
-
-        let output = fzf.wait_with_output().expect("Failed to read stdout");
-
-        let result = String::from_utf8(output.stdout).expect("Output was not valid UTF-8");
+        let result = handler.handle_fzf();
         if result == "" {
             break;
         }
