@@ -19,18 +19,14 @@ fn main() {
         }
 
         let full_path: String;
-        {
-            let value = result.to_string();
-
-            if value.starts_with("~") {
-                if value.len() > 1 {
-                    full_path = format!("{}{}", &handler.home_path, &value[1..]);
-                } else {
-                    full_path = handler.home_path.to_string();
-                }
+        if result.starts_with("~") {
+            if result.len() > 1 {
+                full_path = format!("{}{}", &handler.home_path, &result[1..]);
             } else {
-                full_path = result.to_string();
+                full_path = handler.home_path.to_string();
             }
+        } else {
+            full_path = result.to_string();
         }
 
         let result = full_path;
