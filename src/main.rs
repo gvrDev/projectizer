@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::{fs, process::Command};
 
 use handler::ProjectizerHandler;
 
@@ -13,20 +13,62 @@ fn main() {
 
     loop {
         let result = handler.handle_fzf();
+        let result = result.trim();
         if result == "" {
             break;
         }
 
-        let mut zellij = Command::new("bash")
+        let full_path: String;
+        {
+            let value = result.to_string();
+
+            if value.starts_with("~") {
+                if value.len() > 1 {
+                    full_path = format!("{}{}", &handler.home_path, &value[1..]);
+                } else {
+                    full_path = handler.home_path.to_string();
+                }
+            } else {
+                full_path = result.to_string();
+            }
+        }
+
+        let result = full_path;
+        let cwd: String;
+
+        match fs::metadata(&result) {
+            Ok(meta) => {
+                if meta.is_file() {
+                    let dirname = Command::new("dirname")
+                        .arg(format!("{}", &result))
+                        .output()
+                        .expect("failed to retrieve dirname");
+                    let dirname = String::from_utf8_lossy(&dirname.stdout).into_owned();
+                    cwd = dirname.trim().to_string();
+                } else {
+                    cwd = result.trim().to_string();
+                }
+            }
+            Err(error) => {
+                println!(
+                    "failed to retrieve info about fzf result. Path: {}, Err: {}",
+                    &result, error
+                );
+                return;
+            }
+        }
+
+        let workspace_name = &result.replace("/", "").replace("-", "").replace(".", "");
+
+        let mut tmux = Command::new("bash")
             .arg("-c")
             .arg(format!(
-                "zellij --layout projectizer_default attach --create {} options --default-cwd {}",
-                result.replace("/", "").replace("-", "").trim(),
-                result
+                "tmux new -A -c {} -s {} \"nvim -c 'edit {}'\"",
+                cwd, workspace_name, result
             ))
             .spawn()
-            .expect("failed to start zellij");
+            .expect("failed to start tmux");
 
-        let _ = &zellij.wait().expect("failed wait for zellij");
+        let _ = &tmux.wait().expect("failed wait for tmux");
     }
 }
